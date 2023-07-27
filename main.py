@@ -35,23 +35,23 @@ def get_stat_from_hh(languages):
         salary_summ = 0
         salary_count = 0
         page = 0
+        page_count = 2
         try:
-            vacancies = hh_search_request(lang, region_id)
-            page_count = vacancies["pages"]
-            found = vacancies["found"]
             while page < page_count:
-                if vacancies:
+                try:
+                    vacancies = hh_search_request(lang, region_id, page)
+                    page_count = vacancies["pages"]
+                    print(page_count)
+                    found = vacancies["found"]
                     for vacancy in vacancies["items"]:
                         salary = predict_rub_salary(vacancy)
                         if salary:
                             salary_summ += salary
                             salary_count += 1
-                page += 1
-                try:
-                    vacancies = hh_search_request(lang, region_id, page)
+                    
                 except requests.HTTPError as e:
-                    vacancies = None
-
+                    continue
+                page += 1
             try:
                 average_salary = int(salary_summ / salary_count)
             except ZeroDivisionError:
@@ -62,6 +62,7 @@ def get_stat_from_hh(languages):
                 "vacancies_processed": salary_count,
                 "average_salary": average_salary,
             }
+            print (stat)
         except requests.HTTPError as e:
             continue
 
@@ -101,7 +102,6 @@ def get_stat_from_super_job(token, languages):
         salary_count = 0
         vacancies = super_job_search_request(token, lang)
         page_count = math.ceil(vacancies["total"] / 20) - 1
-        page_count = 20
         page = 0
         while page <= page_count:
             vacancies = vacancies["objects"]
