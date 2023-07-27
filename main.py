@@ -16,11 +16,10 @@ def hh_search_request(lang, region_id, page=1):
     return response.json()
 
 
-def predict_rub_salary(vacancy):
-    salary = vacancy["salary"]
-    if not salary or salary["currency"] != "RUR":
+def predict_rub_salary(payment_from, payment_to, currency):
+    if currency != "RUR":
         return None
-    return get_average_salary(salary["from"], salary["to"])
+    return get_average_salary(payment_from, payment_to)
 
 
 def get_average_salary(payment_from, payment_to):
@@ -53,10 +52,11 @@ def get_stat_from_hh(languages):
                 page_count = vacancies["pages"]
                 found = vacancies["found"]
                 for vacancy in vacancies["items"]:
-                    salary = predict_rub_salary(vacancy)
-                    if salary:
-                        salary_summ += salary
-                        salary_count += 1
+                    if vacancy["salary"]:
+                        salary = predict_rub_salary(vacancy["salary"]["from"], vacancy["salary"]["to"], vacancy["salary"]["currency"])
+                        if salary:
+                            salary_summ += salary
+                            salary_count += 1
 
             try:
                 average_salary = int(salary_summ / salary_count)
@@ -85,10 +85,8 @@ def super_job_search_request(token, lang, page=0):
     return response.json()
 
 
-def predict_rub_salary_for_superJob(vacancy):
-    payment_from = vacancy["payment_from"]
-    payment_to = vacancy["payment_to"]
-    if vacancy["currency"] != "rub":
+def predict_rub_salary_for_superJob(payment_from,payment_to, currency):
+    if currency != "rub":
         return None
     return get_average_salary(payment_from, payment_to)
 
@@ -98,18 +96,19 @@ def get_stat_from_super_job(token, languages):
     for lang in languages:
         salary_summ = 0
         salary_count = 0
-        vacancies = super_job_search_request(token, lang)
-        page_count = math.ceil(vacancies["total"] / 20) - 1
+        page_count = 2
         page = 0
         while page <= page_count:
+            vacancies = super_job_search_request(token, lang, page)
+            page_count = math.ceil(vacancies["total"] / 20) - 1
             vacancies = vacancies["objects"]
             for vacancy in vacancies:
-                salary = predict_rub_salary_for_superJob(vacancy)
+                salary = predict_rub_salary_for_superJob(vacancy["payment_from"], vacancy["payment_to"], vacancy["currency"])
                 if salary:
                     salary_summ += salary
                     salary_count += 1
             page += 1
-            vacancies = super_job_search_request(token, lang, page)
+            
         try:
             average_salary = int(salary_summ / salary_count)
         except ZeroDivisionError:
