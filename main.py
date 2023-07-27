@@ -45,7 +45,6 @@ def get_stat_from_hh(languages):
                     continue
                 page += 1
                 page_count = vacancies["pages"]
-                print(page_count)
                 found = vacancies["found"]
                 for vacancy in vacancies["items"]:
                     salary = predict_rub_salary(vacancy)
@@ -64,7 +63,6 @@ def get_stat_from_hh(languages):
                 "vacancies_processed": salary_count,
                 "average_salary": average_salary,
             }
-            print (stat)
         except requests.HTTPError as e:
             continue
 
