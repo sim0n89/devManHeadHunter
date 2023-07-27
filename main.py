@@ -40,18 +40,20 @@ def get_stat_from_hh(languages):
             while page < page_count:
                 try:
                     vacancies = hh_search_request(lang, region_id, page)
-                    page_count = vacancies["pages"]
-                    print(page_count)
-                    found = vacancies["found"]
-                    for vacancy in vacancies["items"]:
-                        salary = predict_rub_salary(vacancy)
-                        if salary:
-                            salary_summ += salary
-                            salary_count += 1
-                    
                 except requests.HTTPError as e:
+                    page += 1
                     continue
                 page += 1
+                page_count = vacancies["pages"]
+                print(page_count)
+                found = vacancies["found"]
+                for vacancy in vacancies["items"]:
+                    salary = predict_rub_salary(vacancy)
+                    if salary:
+                        salary_summ += salary
+                        salary_count += 1
+                    
+                
             try:
                 average_salary = int(salary_summ / salary_count)
             except ZeroDivisionError:
