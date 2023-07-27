@@ -100,7 +100,8 @@ def get_stat_from_super_job(token, languages):
         page = 0
         while page <= page_count:
             vacancies = super_job_search_request(token, lang, page)
-            page_count = math.ceil(vacancies["total"] / 20) - 1
+            per_page = 20
+            page_count = math.ceil(vacancies["total"] / per_page) - 1
             vacancies = vacancies["objects"]
             for vacancy in vacancies:
                 salary = predict_rub_salary_for_superJob(vacancy["payment_from"], vacancy["payment_to"], vacancy["currency"])
