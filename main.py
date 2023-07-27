@@ -20,12 +20,18 @@ def predict_rub_salary(vacancy):
     salary = vacancy["salary"]
     if not salary or salary["currency"] != "RUR":
         return None
-    if salary["to"] and salary["from"]:
-        return (salary["to"] + salary["from"]) / 2
-    elif not salary["to"]:
-        return salary["from"] * 1.2
-    elif not salary["from"]:
-        return salary["to"] * 0.8
+    return get_average_salary(salary["from"], salary["to"])
+
+
+def get_average_salary(payment_from, payment_to):
+    if payment_from > 0 and payment_to > 0:
+        return (payment_to + payment_from) / 2
+    elif payment_from == 0 and payment_to > 0:
+        return payment_to * 0.8
+    elif payment_to == 0 and payment_from > 0:
+        return payment_from * 1.2
+    else:
+        return None
 
 
 def get_stat_from_hh(languages):
@@ -51,8 +57,7 @@ def get_stat_from_hh(languages):
                     if salary:
                         salary_summ += salary
                         salary_count += 1
-                    
-                
+
             try:
                 average_salary = int(salary_summ / salary_count)
             except ZeroDivisionError:
@@ -85,14 +90,7 @@ def predict_rub_salary_for_superJob(vacancy):
     payment_to = vacancy["payment_to"]
     if vacancy["currency"] != "rub":
         return None
-    if payment_from > 0 and payment_to > 0:
-        return (payment_to + payment_from) / 2
-    elif payment_from == 0 and payment_to > 0:
-        return payment_to * 0.8
-    elif payment_to == 0 and payment_from > 0:
-        return payment_from * 1.2
-    else:
-        return None
+    return get_average_salary(payment_from, payment_to)
 
 
 def get_stat_from_super_job(token, languages):
