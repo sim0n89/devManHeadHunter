@@ -141,11 +141,11 @@ def main():
 
     hh_stat = get_stat_from_hh(languages)
     sj_stat = get_stat_from_super_job(super_job_token, languages)
-    print(print_stat("HeadHunter Moscow", hh_stat))
-    print(print_stat("SuperJob Moscow", sj_stat))
+    print(make_stat_table("HeadHunter Moscow", hh_stat))
+    print(make_stat_table("SuperJob Moscow", sj_stat))
 
 
-def print_stat(table_title, stat):
+def make_stat_table(table_title, stat):
     table_stat = [
         (
             "Язык программирования",
