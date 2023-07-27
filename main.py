@@ -7,33 +7,25 @@ import math
 from terminaltables import AsciiTable
 
 
-def get_hh_search(lang, region_id, page=1):
-    try:
-        response = requests.get(
-            "https://api.hh.ru/vacancies",
-            params={"text": f"Программист {lang}", "area": region_id, "page": page},
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.HTTPError as e:
-        print('Error', e)
-        return None
+def hh_search_request(lang, region_id, page=1):
+    response = requests.get(
+        "https://api.hh.ru/vacancies",
+        params={"text": f"Программист {lang}", "area": region_id, "page": page},
+    )
+    response.raise_for_status()
+    return response.json()
 
 
-def predict_rub_salary(vacance):
-    salary = vacance["salary"]
-    if salary:
-        if salary["currency"] == "RUR":
-            if salary["to"] and salary["from"]:
-                return (salary["to"] + salary["from"]) / 2
-            elif not salary["to"]:
-                return salary["from"] * 1.2
-            elif not salary["from"]:
-                return salary["to"] * 0.8
-        else:
-            return None
-    else:
+def predict_rub_salary(vacancy):
+    salary = vacancy["salary"]
+    if not salary or salary["currency"] != "RUR":
         return None
+    if salary["to"] and salary["from"]:
+        return (salary["to"] + salary["from"]) / 2
+    elif not salary["to"]:
+        return salary["from"] * 1.2
+    elif not salary["from"]:
+        return salary["to"] * 0.8
 
 
 def get_stat_from_hh(languages):
@@ -43,30 +35,40 @@ def get_stat_from_hh(languages):
         salary_summ = 0
         salary_count = 0
         page = 0
-        vacancies = get_hh_search(lang, region_id)
-        if vacancies:
+        try:
+            vacancies = hh_search_request(lang, region_id)
             page_count = vacancies["pages"]
             found = vacancies["found"]
             while page < page_count:
-                vacancies = get_hh_search(lang, region_id, page)
                 if vacancies:
-                    for vacance in vacancies["items"]:
-                        salary = predict_rub_salary(vacance)
+                    for vacancy in vacancies["items"]:
+                        salary = predict_rub_salary(vacancy)
                         if salary:
                             salary_summ += salary
                             salary_count += 1
                 page += 1
-            average_salary = int(salary_summ / salary_count)
+                try:
+                    vacancies = hh_search_request(lang, region_id, page)
+                except requests.HTTPError as e:
+                    vacancies = None
+
+            try:
+                average_salary = int(salary_summ / salary_count)
+            except ZeroDivisionError:
+                average_salary = 0
+
             stat[lang] = {
                 "vacancies_found": found,
                 "vacancies_processed": salary_count,
                 "average_salary": average_salary,
             }
+        except requests.HTTPError as e:
+            continue
 
     return stat
 
 
-def get_super_job_search(token, lang, page=0):
+def super_job_search_request(token, lang, page=0):
     headers = {"X-Api-App-Id": token}
     response = requests.get(
         "https://api.superjob.ru/2.0/vacancies/",
@@ -77,18 +79,17 @@ def get_super_job_search(token, lang, page=0):
     return response.json()
 
 
-def predict_rub_salary_for_superJob(vacance):
-    payment_from = vacance["payment_from"]
-    payment_to = vacance["payment_to"]
-    if vacance["currency"] == "rub":
-        if payment_from > 0 and payment_to > 0:
-            return (payment_to + payment_from) / 2
-        elif payment_from == 0 and payment_to > 0:
-            return payment_to * 0.8
-        elif payment_to == 0 and payment_from > 0:
-            return payment_from * 1.2
-        else:
-            return None
+def predict_rub_salary_for_superJob(vacancy):
+    payment_from = vacancy["payment_from"]
+    payment_to = vacancy["payment_to"]
+    if vacancy["currency"] != "rub":
+        return None
+    if payment_from > 0 and payment_to > 0:
+        return (payment_to + payment_from) / 2
+    elif payment_from == 0 and payment_to > 0:
+        return payment_to * 0.8
+    elif payment_to == 0 and payment_from > 0:
+        return payment_from * 1.2
     else:
         return None
 
@@ -98,20 +99,24 @@ def get_stat_from_super_job(token, languages):
     for lang in languages:
         salary_summ = 0
         salary_count = 0
-        vacancies = get_super_job_search(token, lang)
+        vacancies = super_job_search_request(token, lang)
         page_count = math.ceil(vacancies["total"] / 20) - 1
         page_count = 20
         page = 0
         while page <= page_count:
-            vacancies = get_super_job_search(token, lang, page)
-            vacancies_list = vacancies["objects"]
-            for vacance in vacancies_list:
-                salary = predict_rub_salary_for_superJob(vacance)
+            vacancies = vacancies["objects"]
+            for vacancy in vacancies:
+                salary = predict_rub_salary_for_superJob(vacancy)
                 if salary:
                     salary_summ += salary
                     salary_count += 1
             page += 1
-        average_salary = int(salary_summ / salary_count)
+            vacancies = super_job_search_request(token, lang, page)
+        try:
+            average_salary = int(salary_summ / salary_count)
+        except ZeroDivisionError:
+            average_salary = 0
+
         stat[lang] = {
             "vacancies_found": vacancies["total"],
             "vacancies_processed": salary_count,
@@ -136,12 +141,12 @@ def main():
 
     hh_stat = get_stat_from_hh(languages)
     sj_stat = get_stat_from_super_job(super_job_token, languages)
-    print_stat("HeadHunter Moscow", hh_stat)
-    print_stat("SuperJob Moscow", sj_stat)
+    print(print_stat("HeadHunter Moscow", hh_stat))
+    print(print_stat("SuperJob Moscow", sj_stat))
 
 
 def print_stat(table_title, stat):
-    table_data = [
+    table_stat = [
         (
             "Язык программирования",
             "Вакансий найдено",
@@ -149,17 +154,17 @@ def print_stat(table_title, stat):
             "Средняя зарплата",
         )
     ]
-    for key in stat.keys():
+    for stat_name in stat.keys():
         stat_item = (
-            key,
-            stat[key]["vacancies_found"],
-            stat[key]["vacancies_processed"],
-            stat[key]["average_salary"],
+            stat_name,
+            stat[stat_name]["vacancies_found"],
+            stat[stat_name]["vacancies_processed"],
+            stat[stat_name]["average_salary"],
         )
-        table_data.append(stat_item)
+        table_stat.append(stat_item)
 
-    table_instance = AsciiTable(table_data, table_title)
-    print(table_instance.table)
+    table_instance = AsciiTable(table_stat, table_title)
+    return table_instance
 
 
 if __name__ == "__main__":
